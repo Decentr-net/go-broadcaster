@@ -149,7 +149,7 @@ func (b *Broadcaster) Ping() error {
 }
 
 func (b *Broadcaster) broadcast(msgs []sdk.Msg, memo string) error {
-	txBldr := auth.NewTxBuilder(b.enc, b.num, b.seq, 0, 1.0, false,
+	txBldr := auth.NewTxBuilder(b.enc, b.num, b.seq, 10, 1.0, false,
 		b.chainID, memo, nil, nil).WithKeybase(b.ctx.Keybase)
 
 	b.mu.Lock()
