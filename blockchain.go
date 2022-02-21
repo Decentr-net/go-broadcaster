@@ -48,7 +48,7 @@ type Broadcaster interface {
 	PingContext(ctx context.Context) error
 }
 
-var accountSequenceMismatchErrorRegExp = regexp.MustCompile(`^account sequence mismatch, expected (\d+), got \d+:`)
+var accountSequenceMismatchErrorRegExp = regexp.MustCompile(`.+account sequence mismatch, expected (\d+), got \d+:.+`)
 
 type broadcaster struct {
 	ctx client.Context
@@ -182,8 +182,10 @@ func (b *broadcaster) PingContext(ctx context.Context) error {
 }
 
 func (b *broadcaster) broadcast(msgs []sdk.Msg, memo string, isRetry bool) (*sdk.TxResponse, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	if !isRetry {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+	}
 
 	txf := b.txf.WithMemo(memo)
 
@@ -194,8 +196,11 @@ func (b *broadcaster) broadcast(msgs []sdk.Msg, memo string, isRetry bool) (*sdk
 	if txf.Gas() == 0 {
 		_, gas, err := tx.CalculateGas(b.ctx, txf, msgs...)
 		if err != nil {
-			if seq := getNextSequence(err.Error()); !isRetry && seq != 0 {
-				b.txf = b.txf.WithSequence(seq)
+			if !isRetry {
+				if seq := getNextSequence(err.Error()); seq != 0 {
+					b.txf = b.txf.WithSequence(seq)
+				}
+
 				return b.broadcast(msgs, memo, true)
 			}
 
@@ -229,8 +234,11 @@ func (b *broadcaster) broadcast(msgs []sdk.Msg, memo string, isRetry bool) (*sdk
 			return nil, ErrTxInMempoolCache
 		}
 
-		if seq := getNextSequence(resp.RawLog); !isRetry && seq != 0 {
-			b.txf = b.txf.WithSequence(seq)
+		if !isRetry {
+			if seq := getNextSequence(resp.RawLog); seq != 0 {
+				b.txf = b.txf.WithSequence(seq)
+			}
+
 			return b.broadcast(msgs, memo, true)
 		}
 
